@@ -210,9 +210,12 @@ let isPolymorphicRecursive (t : Type) =
     else
         false
 
+
+let cache = System.Collections.Concurrent.ConcurrentDictionary<Type,bool>()
+
 /// Checks if type is 'recursive' according to above definition
 /// Note that type must additionally be a reference type for this to be meaningful.
-let isRecursiveType openHierarchiesOnly (t : Type) =
+let isRecursiveType' openHierarchiesOnly (t : Type) =
     let rec aux (traversed : Type list) (t : Type) =
         if t.IsPrimitive then false
         elif typeof<MemberInfo>.IsAssignableFrom t then false
@@ -242,6 +245,7 @@ let isRecursiveType openHierarchiesOnly (t : Type) =
         // leaves with open hiearchies are treated as recursive by definition
         elif not t.IsSealed then true
         else
+            printfn "gather oida: %A" t
             gatherSerializedFields t
             |> Seq.map (fun f -> f.FieldType)
             |> Seq.distinct
@@ -249,6 +253,10 @@ let isRecursiveType openHierarchiesOnly (t : Type) =
 
     aux [] t
 
+let isRecursiveType openHierarchiesOnly (t : Type) =
+    cache.GetOrAdd(t, fun k ->
+        isRecursiveType' openHierarchiesOnly t
+    )
 
 //
 //  types like int * bool, int option, etc have object graphs of fixed size
